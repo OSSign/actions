@@ -31909,77 +31909,110 @@ const createInstance = (defaults) => {
 };
 const ky = createInstance();
 
-const username = coreExports.getInput("username");
-const token = coreExports.getInput("token");
-var ref_name = "";
-try {
-    ref_name = githubExports.context.ref.replace("refs/heads/", "").replace("refs/tags/", "");
-    coreExports.info(`Starting build for ${ref_name}`);
-}
-catch (error) {
-    coreExports.setFailed("Error retrieving ref name");
-}
-try {
-    coreExports.info(`Triggering workflow dispatch for ${ref_name} in ${githubExports.context.repo.repo}...`);
-    const startRequest = {
-        source_branch: ref_name,
-        release_name: 'Ref: ' + ref_name + ' - ' + new Date().toISOString(),
-    };
-    const response = await ky.post(`https://api.ossign.org/api/v1/dispatch/${username}`, {
+async function CallApi(action, body, token) {
+    const response = await ky.post(`https://api.ossign.org/api/v1/${action}`, {
         timeout: 60000,
         headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${token}`,
         },
-        body: JSON.stringify(startRequest)
+        body: body
     });
     if (!response.ok) {
         const errorText = await response.text();
-        coreExports.setFailed(`Failed to trigger workflow dispatch: ${response.status} ${response.statusText} - ${errorText}`);
+        coreExports.setFailed(`Failed to call API ${action}: ${response.status} ${response.statusText} - ${errorText}`);
     }
     const responseData = await response.json();
+    coreExports.debug(`Response from API ${action}: ${JSON.stringify(responseData)}`);
     if ("message" in responseData) {
-        coreExports.setFailed(`Failed to trigger workflow dispatch: ${responseData.message}`);
+        coreExports.setFailed(`Failed to call API ${action}: ${responseData.message}`);
     }
     const verifiedResponseData = responseData;
-    coreExports.info(`Workflow dispatch triggered successfully. Workflow Run ID: ${verifiedResponseData.workflow_run_id}`);
-    coreExports.info(`Waiting for workflow to complete...`);
+    return verifiedResponseData;
+}
+async function DispatchWorkflow(username, token, ref_name) {
+    coreExports.info(`Triggering workflow dispatch for ${ref_name} in ${githubExports.context.repo.repo}...`);
+    const startRequest = {
+        source_branch: ref_name,
+        release_name: 'Ref: ' + ref_name + ' - ' + new Date().toISOString(),
+    };
+    const response = await CallApi(`dispatch/${username}`, JSON.stringify(startRequest), token);
+    return response;
+}
+async function CheckWorkflow(username, token, id) {
+    coreExports.info(`Checking workflow status for ID ${id}...`);
+    const response = await CallApi(`check/${username}/${id}`, undefined, token);
+    return response;
+}
+async function run() {
+    const username = coreExports.getInput("username");
+    const token = coreExports.getInput("token");
+    const dispatch_only = coreExports.getInput("dispatch_only").toLowerCase() === "true";
+    const single_check = coreExports.getInput("single_check");
+    if (!username || username.trim() === "") {
+        coreExports.setFailed("Username is required");
+        return;
+    }
+    if (!token || token.trim() === "") {
+        coreExports.setFailed("Token is required");
+        return;
+    }
+    let verifiedResponseData;
+    // If single_check is provided, only check the status of that workflow
+    if (single_check && single_check.trim() !== "") {
+        coreExports.info(`Single check mode enabled, checking status of workflow ID ${single_check}...`);
+        verifiedResponseData = await CheckWorkflow(username, token, single_check);
+        if (verifiedResponseData?.completed) {
+            coreExports.info("Workflow completed successfully.");
+            if (verifiedResponseData.release_assets && verifiedResponseData.release_assets.length > 0) {
+                coreExports.info("Signed artifacts:");
+                verifiedResponseData.release_assets.forEach(asset => {
+                    coreExports.info(`- ${asset.name}: ${asset.browser_download_url}`);
+                });
+                coreExports.setOutput("signed_artifacts", JSON.stringify(verifiedResponseData.release_assets));
+            }
+            else {
+                coreExports.info("No signed artifacts found.");
+            }
+            coreExports.setOutput("finished", true);
+            return true;
+        }
+        coreExports.info("Workflow not completed yet.");
+        coreExports.setOutput("signed_artifacts", "");
+        coreExports.setOutput("finished", false);
+        return false;
+    }
+    coreExports.info("Dispatching new workflow...");
+    try {
+        verifiedResponseData = await DispatchWorkflow(username, token, githubExports.context.ref.replace("refs/heads/", "").replace("refs/tags/", ""));
+    }
+    catch (error) {
+        coreExports.setFailed("Error dispatching workflow");
+        return;
+    }
+    if (dispatch_only) {
+        coreExports.info("Dispatch only mode enabled, exiting after dispatch.");
+        coreExports.setOutput("signed_artifacts", "");
+        coreExports.setOutput("workflow_id", verifiedResponseData.id);
+        coreExports.setOutput("finished", false);
+        return;
+    }
     const pollInterval = 15000;
     const timeout = 1000 * 60 * 60 * 24;
     const startTime = Date.now();
-    let numErrors = 0;
-    let numErrorsMax = 5;
     let completed = false;
     let lastStatus = "";
-    let verifiedStatusData = null;
     while (!completed && (Date.now() - startTime) < timeout) {
         await new Promise(resolve => setTimeout(resolve, pollInterval));
-        const statusResponse = await ky.post(`https://api.ossign.org/api/v1/check/${username}/${verifiedResponseData.id}`, {
-            timeout: 60000,
-            headers: {
-                'Authorization': `Bearer ${token}`,
-            }
-        });
-        if (!statusResponse.ok) {
-            numErrors++;
-            const errorText = await statusResponse.text();
-            if (numErrors >= numErrorsMax) {
-                coreExports.setFailed(`Failed to get workflow status: ${statusResponse.status} ${statusResponse.statusText} - ${errorText}`);
-                break;
-            }
-            else {
-                coreExports.warning(`Error getting workflow status (attempt ${numErrors} of ${numErrorsMax}): ${statusResponse.status} ${statusResponse.statusText} - ${errorText}`);
-                continue;
-            }
+        verifiedResponseData = await CheckWorkflow(username, token, verifiedResponseData.id);
+        if (lastStatus !== verifiedResponseData.last_status) {
+            coreExports.info(`Status is now: ${verifiedResponseData.last_status}`);
         }
-        const statusData = await statusResponse.json();
-        if ("message" in statusData) {
-            coreExports.setFailed(`Failed to get workflow status: ${statusData.message}`);
+        lastStatus = verifiedResponseData.last_status || "";
+        completed = verifiedResponseData.completed || false;
+        if (completed) {
+            break;
         }
-        verifiedStatusData = statusData;
-        completed = verifiedStatusData.completed || false;
-        lastStatus = verifiedStatusData.last_status || "";
-        coreExports.info(`Current status: ${lastStatus}`);
     }
     if (!completed) {
         coreExports.setFailed("Workflow did not complete within the timeout period.");
@@ -31991,14 +32024,15 @@ try {
             verifiedResponseData.release_assets.forEach(asset => {
                 coreExports.info(`- ${asset.name}: ${asset.browser_download_url}`);
             });
+            coreExports.setOutput("signed_artifacts", JSON.stringify(verifiedResponseData.release_assets));
         }
         else {
             coreExports.info("No signed artifacts found.");
         }
+        coreExports.setOutput("finished", true);
+        return true;
     }
-    coreExports.setOutput("artifacts", verifiedStatusData?.release_assets ? JSON.stringify(verifiedStatusData.release_assets) : "[]");
 }
-catch (err) {
-    coreExports.setFailed(err instanceof Error ? err.message : String(err));
-}
+
+run();
 //# sourceMappingURL=index.js.map

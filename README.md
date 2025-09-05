@@ -1,2 +1,132 @@
 # actions
 Github actions for various code signing tasks
+
+## workflow/dispatch
+Use this action to trigger code signing workflows in your repository, wait for completion, and retrieve signed artifacts. You need to have a pre-existing OSSign repository set up for your project, including credentials, to use this action.
+Since the signature process requires manual approval, there are two choices for waiting for completion:
+
+### Polling/Live Wait
+This will keep the workflow running until the signing is complete. Do **not** use this on paid runners, since the runner will be occupied and incur charges for the entire waiting period. This one is mostly suitable for public, free workflows.
+This action will trigger the build and sign workflow from the current branch, meaning if you run it from `main` the resulting workflow will fetch the code from `main`, `1.2.0` will fetch from `1.2.0`, etc.
+
+Example:
+```yaml
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: ossign/actions/workflow/dispatch@main
+        id: dispatch
+        with:
+          username: ${{ secrets.MY_USERNAME }}
+          token: ${{ secrets.MY_TOKEN }}
+      - run: |
+          echo "Finished dispatch workflow: ${{ steps.dispatch.outputs.signed_artifacts }}"
+```
+
+### Dispatch/Sleep/Check
+This type will first dispatch the signing workflow, then use environments to sleep for a while (e.g. 30 minutes) and then run a check action to see if the signing is complete.
+
+First, set up an environment on your repository called "Signatures" (or any name you prefer, just make sure to use the same name in the workflow). 
+Then, add a mandatory waiting period for running workflows in this environment (e.g. 30 minutes).
+
+Create the first workflow file like this:
+
+```yaml
+# dispatch.yml
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - uses: ossign/actions/workflow/dispatch@main
+        id: dispatch
+        with:
+          username: ${{ secrets.MY_USERNAME }}
+          token: ${{ secrets.MY_TOKEN }}
+          dispatch_only: true
+    
+      - run: |
+          echo "Received workflow ID: ${{ steps.dispatch.outputs.workflow_id }}"
+    
+      - name: Start the waiting loop
+        uses: 
+          uses: benc-uk/workflow-dispatch@v1
+          with:
+            workflow: waiting-loop.yml
+            inputs: |
+                { "workflow_id": "${{ steps.dispatch.outputs.workflow_id }}" }
+```
+
+Then, create a second workflow file like this:
+
+```yaml
+# waiting-loop.yml
+on:
+  workflow_dispatch:
+    inputs:
+      workflow_id:
+        description: 'The workflow ID from dispatch'
+        required: true
+        type: string
+      attempt:
+        required: false
+        description: 'The attempt number'
+        type: number
+        default: 1
+      max_attempts:
+        required: false
+        description: 'The maximum number of attempts (times the waiting period duration you set in the environment gives the max wait time, e.g. 30 minutes * 48 = 24 hours)'
+        type: number
+        default: 100
+
+jobs:
+    wait-and-check:
+        runs-on: ubuntu-latest
+        environment: Signatures
+        steps:
+          - name: Check if the threshold has been reached
+            shell: bash
+            run: |
+                if [ ${{ github.event.inputs.attempt }} -gt ${{ github.event.inputs.max_attempts }} ]; then
+                  echo "Maximum number of attempts reached, exiting."
+                  exit 1
+                fi
+        
+          - name: Check if signing is finished
+            id: check
+            uses: ossign/actions/workflow/dispatch@main
+            with:
+              username: ${{ secrets.MY_USERNAME }}
+              token: ${{ secrets.MY_TOKEN }}
+              single_check: ${{ github.event.inputs.workflow_id }}
+        
+          - name: If artifacts were returned, we are done!
+             if: steps.check.outputs.signed_artifacts != ''
+             run: |
+               echo "Signing complete, signed artifacts: ${{ steps.check.outputs.signed_artifacts }}"
+            
+          - name: If signing is not finished, restart the workflow
+            if: steps.check.outputs.signed_artifacts == ''
+            uses: 
+              uses: benc-uk/workflow-dispatch@v1
+              with:
+                workflow: waiting-loop.yml
+                inputs: |
+                    { 
+                      "workflow_id": "${{ github.event.inputs.workflow_id }}",
+                      "attempt": ${{ github.event.inputs.attempt + 1 }},
+                      "max_attempts": ${{ github.event.inputs.max_attempts }}
+                    }

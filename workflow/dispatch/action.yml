@@ -8,6 +8,14 @@ inputs:
   token:
     description: 'The OSSign token to use for authentication. Make sure to put this in a secret.'
     required: true
+  dispatch_only:
+    description: 'If true, the action will dispatch the event and immediately return. If false, the action will wait for the workflow to complete and return signed artifact URLs.'
+    required: false
+    default: 'false'
+  single_check:
+    description: 'If set, the action will only do a single check of the specified workflow run.'
+    required: false
+    default: ''
 branding:
   icon: 'feather'
   color: 'blue'
@@ -15,5 +23,9 @@ runs:
   using: node24
   main: 'dist/index.js'
 outputs:
+  workflow_id:
+    description: 'The ID of the dispatched workflow run.'
   signed_artifacts:
     description: 'A list of signed artifacts URLs.'
+  finished:
+    description: 'Whether the workflow has finished or not.'
