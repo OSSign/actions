@@ -38,6 +38,7 @@ try {
     };
 
     const response = await ky.post(`https://api.ossign.org/api/v1/dispatch/${username}`, {
+        timeout: 60000,
         headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${token}`,
@@ -75,6 +76,7 @@ try {
         await new Promise(resolve => setTimeout(resolve, pollInterval));
 
         const statusResponse = await ky.post(`https://api.ossign.org/api/v1/status/${username}/${verifiedResponseData.id}`, {
+            timeout: 60000,
             headers: {
                 'Authorization': `Bearer ${token}`,
             }

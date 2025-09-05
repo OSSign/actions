@@ -31926,6 +31926,7 @@ try {
         release_name: 'Ref: ' + ref_name + ' - ' + new Date().toISOString(),
     };
     const response = await ky.post(`https://api.ossign.org/api/v1/dispatch/${username}`, {
+        timeout: 60000,
         headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${token}`,
@@ -31952,6 +31953,7 @@ try {
     while (!completed && (Date.now() - startTime) < timeout) {
         await new Promise(resolve => setTimeout(resolve, pollInterval));
         const statusResponse = await ky.post(`https://api.ossign.org/api/v1/status/${username}/${verifiedResponseData.id}`, {
+            timeout: 60000,
             headers: {
                 'Authorization': `Bearer ${token}`,
             }
