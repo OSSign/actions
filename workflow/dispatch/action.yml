@@ -1,0 +1,26 @@
+name: 'OSSign: Workflow Dispatch'
+description: "Use this action to trigger a workflow containing signing for your repository, wait and retrieve signed artifacts. You need to have a pre-existing OSSign repository set up for your project, including credentials, to use this action."
+author: 'OSSign Team'
+inputs:
+  username:
+    description: 'The OSSign username to use for authentication. Make sure to put this in a secret.'
+    required: true
+  token:
+    description: 'The OSSign token to use for authentication. Make sure to put this in a secret.'
+    required: true
+  from_branch:
+    description: 'The branch to trigger the workflow from. Defaults to the main branch of the repository.'
+    required: false
+    default: 'main'
+  release_name:
+    description: 'The name of the release that is published in the OSSign repository'
+    required: true
+branding:
+  icon: 'feather'
+  color: 'blue'
+runs:
+  using: node24
+  main: 'dist/index.js'
+outputs:
+  signed_artifacts:
+    description: 'A list of signed artifacts URLs.'

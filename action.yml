@@ -1,0 +1,11 @@
+name: 'OSSign: Information'
+description: "Do not use this action directly. Instead, use one of the sub-actions defined in the documentation."
+author: 'OSSign Team'
+runs:
+  using: 'composite'
+  steps:
+    - name: 'Information'
+      run: |
+        echo 'This is just information. Read [the documentation](https://github.com/ossign/actions).'
+        exit 1
+      shell: bash
