@@ -31923,7 +31923,6 @@ async function CallApi(action, body, token) {
         coreExports.setFailed(`Failed to call API ${action}: ${response.status} ${response.statusText} - ${errorText}`);
     }
     const responseData = await response.json();
-    coreExports.debug(`Response from API ${action}: ${JSON.stringify(responseData)}`);
     if ("message" in responseData) {
         coreExports.setFailed(`Failed to call API ${action}: ${responseData.message}`);
     }
@@ -31987,6 +31986,7 @@ async function run() {
         verifiedResponseData = await DispatchWorkflow(username, token, githubExports.context.ref.replace("refs/heads/", "").replace("refs/tags/", ""));
     }
     catch (error) {
+        coreExports.debug(error instanceof Error ? error.message : String(error));
         coreExports.setFailed("Error dispatching workflow");
         return;
     }
