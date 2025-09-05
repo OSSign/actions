@@ -66,6 +66,8 @@ try {
     const pollInterval = 15000;
     const timeout = 1000 * 60 * 60 * 24;
     const startTime = Date.now();
+    let numErrors = 0;
+    let numErrorsMax = 5;
 
     let completed = false;
     let lastStatus = "";
@@ -75,7 +77,7 @@ try {
     while (!completed && (Date.now() - startTime) < timeout) {
         await new Promise(resolve => setTimeout(resolve, pollInterval));
 
-        const statusResponse = await ky.post(`https://api.ossign.org/api/v1/status/${username}/${verifiedResponseData.id}`, {
+        const statusResponse = await ky.post(`https://api.ossign.org/api/v1/check/${username}/${verifiedResponseData.id}`, {
             timeout: 60000,
             headers: {
                 'Authorization': `Bearer ${token}`,
@@ -83,8 +85,15 @@ try {
         });
 
         if (!statusResponse.ok) {
+            numErrors++;
             const errorText = await statusResponse.text();
-            core.setFailed(`Failed to get workflow status: ${statusResponse.status} ${statusResponse.statusText} - ${errorText}`);
+            if (numErrors >= numErrorsMax) {
+                core.setFailed(`Failed to get workflow status: ${statusResponse.status} ${statusResponse.statusText} - ${errorText}`);
+                break;
+            } else {
+                core.warning(`Error getting workflow status (attempt ${numErrors} of ${numErrorsMax}): ${statusResponse.status} ${statusResponse.statusText} - ${errorText}`);
+                continue;
+            }
         }
 
         const statusData: WorkflowStatusResponse | Error = await statusResponse.json();
