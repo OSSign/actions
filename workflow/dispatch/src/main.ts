@@ -21,8 +21,6 @@ async function CallApi(action: string, body: any, token: string) : Promise<Workf
 
     const responseData: WorkflowStatusResponse | Error = await response.json();
 
-    core.debug(`Response from API ${action}: ${JSON.stringify(responseData)}`);
-
     if ("message" in responseData) {
         core.setFailed(`Failed to call API ${action}: ${responseData.message}`);
     }
@@ -106,6 +104,7 @@ export async function run() {
     try {
         verifiedResponseData = await DispatchWorkflow(username, token, github.context.ref.replace("refs/heads/", "").replace("refs/tags/", ""));
     } catch (error) {
+        core.debug(error instanceof Error ? error.message : String(error));
         core.setFailed("Error dispatching workflow");
         return;
     }
