@@ -8,13 +8,6 @@ inputs:
   token:
     description: 'The OSSign token to use for authentication. Make sure to put this in a secret.'
     required: true
-  from_branch:
-    description: 'The branch to trigger the workflow from. Defaults to the main branch of the repository.'
-    required: false
-    default: 'main'
-  release_name:
-    description: 'The name of the release that is published in the OSSign repository'
-    required: true
 branding:
   icon: 'feather'
   color: 'blue'
