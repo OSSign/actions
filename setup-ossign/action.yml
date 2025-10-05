@@ -1,0 +1,26 @@
+name: Setup OSSign
+description: Install the OSSign tool for signing and verifying open source software artifacts.
+author: OSSign
+
+branding:
+  icon: feather
+  color: green
+
+inputs:
+  token:
+    description: 'GitHub token with repo read access'
+    required: true
+  ossignConfig:
+    description: 'The configuration for ossign (JSON)'
+    required: true
+    default: '{}' 
+
+runs:
+  using: composite
+  steps:
+    - name: Install OSSign
+      uses: ossign/ossign@main
+      with:
+        token: '${{ inputs.token }}'
+        config: '${{ inputs.ossignConfig }}'
+        installOnly: 'true'
