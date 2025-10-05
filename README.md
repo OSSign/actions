@@ -16,8 +16,11 @@ jobs:
       - uses: actions/checkout@v3
       - uses: ossign/actions/setup-ossign@main
         with:
-          username: ${{ secrets.TEST_USERNAME }}
-          token: ${{ secrets.TEST_TOKEN }}
+          # Required to fetch the binary
+          # only needs read access to public repos
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+          # Set the OSSign config on the server. Can be set to an empty string if you want to provide this via the -c flag on run
           ossignConfig: |
             {
                 "tokenType": "azure",
