@@ -1,48 +1,10 @@
 # actions
-Github actions for various code signing tasks
+Github actions for various code signing tasks.
 
-## setup-ossign
-Use this action to set up the OSSign binary in your workflow. It will download and install the OSSign CLI tool, and configure it with your credentials.
-Example:
-```yaml
-on:
-  push:
-    tags:
-      - 'v*.*.*'
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - uses: ossign/actions/setup-ossign@main
-        with:
-          # Required to fetch the binary
-          # only needs read access to public repos
-          token: ${{ secrets.GITHUB_TOKEN }}
+## Summary
+The **ossign/actions/workflow/dispatch** action is primarily for those who have our code signing service. This workflow will submit a request to build and/or sign a binary for your project, you will need a username and key to use it to send the requests. You will be provided the credentials when your application is approved.
 
-          # Set the OSSign config on the server. Can be set to an empty string if you want to provide this via the -c flag on run
-          ossignConfig: |
-            {
-                "tokenType": "azure",
-                "azure": {
-                    "vaultUrl": ""
-                    "tenantId": "",
-                    "clientId": "",
-                    "clientSecret": "",
-                    "certificateName": "",
-                    "certificateVersion": ""
-                },
-                "certificate": {
-                    "certificate": "",
-                    "privateKey": ""
-                },
-                "timestampUrl": "http://timestamp.globalsign.com/tsa/advanced",
-                "msTimestampUrl": "http://timestamp.microsoft.com/tsa"
-            }
-
-      - run: |
-          ossign --sign-type msi filetosign.msi --output signedfile.msi
-```
+The **ossign/actions/setup-ossign** action belongs to our [open source signing tool (ossign/ossign)](https://github.com/ossign/ossign), for more information regarding this visit the repository readme.
 
 ## workflow/dispatch
 Use this action to trigger code signing workflows in your repository, wait for completion, and retrieve signed artifacts. You need to have a pre-existing OSSign repository set up for your project, including credentials, to use this action.
@@ -215,3 +177,51 @@ jobs:
                 }
 
 ```
+
+
+
+
+
+## setup-ossign
+Use this action to set up the OSSign binary in your workflow. It will download and install the OSSign CLI tool, and configure it with your credentials.
+Example:
+```yaml
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: ossign/actions/setup-ossign@main
+        with:
+          # Required to fetch the binary
+          # only needs read access to public repos
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+          # Set the OSSign config on the server. Can be set to an empty string if you want to provide this via the -c flag on run
+          ossignConfig: |
+            {
+                "tokenType": "azure",
+                "azure": {
+                    "vaultUrl": ""
+                    "tenantId": "",
+                    "clientId": "",
+                    "clientSecret": "",
+                    "certificateName": "",
+                    "certificateVersion": ""
+                },
+                "certificate": {
+                    "certificate": "",
+                    "privateKey": ""
+                },
+                "timestampUrl": "http://timestamp.globalsign.com/tsa/advanced",
+                "msTimestampUrl": "http://timestamp.microsoft.com/tsa"
+            }
+
+      - run: |
+          ossign --sign-type msi filetosign.msi --output signedfile.msi
+```
+
