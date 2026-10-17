@@ -7,10 +7,6 @@ branding:
   color: green
 
 inputs:
-  token:
-    description: 'GitHub token with id-token: write access'
-    required: true
-  
   audience:
     description: 'The audience for the trusted token'
     required: true
@@ -28,9 +24,18 @@ runs:
   steps:
     - name: Get Trusted Token
       shell: bash
+      env:
+        ACTIONS_ID_TOKEN_REQUEST_TOKEN: ${{ env.ACTIONS_ID_TOKEN_REQUEST_TOKEN }}
+        ACTIONS_ID_TOKEN_REQUEST_URL: ${{ env.ACTIONS_ID_TOKEN_REQUEST_URL }}
       run: |
         echo "Getting a trusted token..."
         set -euo pipefail
+
+        # If token is not set, error out
+        if [ -z "$ACTIONS_ID_TOKEN_REQUEST_TOKEN" ] || [ -z "$ACTIONS_ID_TOKEN_REQUEST_URL" ]; then
+          echo "GitHub Actions ID token request environment variables are not set. Make sure you have the id-token: write permission set on your workflow." >&2
+          exit 1
+        fi
 
         # urlencoded audience
         AUDIENCE="${{ inputs.audience }}"
