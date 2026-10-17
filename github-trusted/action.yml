@@ -18,39 +18,48 @@ inputs:
 outputs:
   trusted_token:
     description: 'The trusted token obtained from the exchange'
+    value: ${{ steps.exchange.outputs.trusted_token }}
 
 runs:
   using: composite
   steps:
     - name: Get Trusted Token
+      id: exchange
       shell: bash
       env:
-        ACTIONS_ID_TOKEN_REQUEST_TOKEN: ${{ env.ACTIONS_ID_TOKEN_REQUEST_TOKEN }}
-        ACTIONS_ID_TOKEN_REQUEST_URL: ${{ env.ACTIONS_ID_TOKEN_REQUEST_URL }}
+        AUDIENCE: ${{ inputs.audience }}
+        EXCHANGE_URL: ${{ inputs.exchange }}
       run: |
         echo "Getting a trusted token..."
         set -euo pipefail
 
         # If token is not set, error out
-        if [ -z "$ACTIONS_ID_TOKEN_REQUEST_TOKEN" ] || [ -z "$ACTIONS_ID_TOKEN_REQUEST_URL" ]; then
+        if [ -z "${ACTIONS_ID_TOKEN_REQUEST_TOKEN:-}" ] || [ -z "${ACTIONS_ID_TOKEN_REQUEST_URL:-}" ]; then
           echo "GitHub Actions ID token request environment variables are not set. Make sure you have the id-token: write permission set on your workflow." >&2
           exit 1
         fi
 
-        # urlencoded audience
-        AUDIENCE="${{ inputs.audience }}"
-        ENCODED_AUDIENCE=$(python3 -c "import urllib.parse; print(urllib.parse.quote('''$AUDIENCE'''))")
-        
-        ID_TOKEN=$(curl -sSf -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=$ENCODED_AUDIENCE" | jq -r .value)
+        if [ -z "$AUDIENCE" ] || [ -z "$EXCHANGE_URL" ]; then
+          echo "The audience and exchange inputs must both be set." >&2
+          exit 1
+        fi
+
+        # Encode the audience as a URL query parameter without evaluating it as code.
+        ENCODED_AUDIENCE=$(jq -rn --arg audience "$AUDIENCE" '$audience | @uri')
+
+        if ! ID_TOKEN=$(curl -sSf -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=$ENCODED_AUDIENCE" | jq -er '.value | strings | select(length > 0) | select(test("[\r\n]") | not)'); then
+          echo "GitHub OIDC request failed or returned no valid token." >&2
+          exit 1
+        fi
 
         echo "::add-mask::$ID_TOKEN"
 
         echo "Exchanging ID token for trusted token..."
 
-        TOKEN=$(curl -sSf -X POST -H "Authorization: Bearer $ID_TOKEN" "${{ inputs.exchange }}" | jq -r .token)
-        
-        if [ -z "$TOKEN" ] || [ "$TOKEN" = "null" ]; then echo "token exchange returned no token" >&2; exit 1; fi
-        
+        if ! TOKEN=$(curl -sSf -X POST -H "Authorization: Bearer $ID_TOKEN" "$EXCHANGE_URL" | jq -er '.token | strings | select(length > 0) | select(test("[\r\n]") | not)'); then
+          echo "Token exchange failed or returned no valid token." >&2
+          exit 1
+        fi
+
         echo "::add-mask::$TOKEN"
-        echo "::set-output name=trusted_token::$TOKEN"
-    
+        printf 'trusted_token=%s\n' "$TOKEN" >> "$GITHUB_OUTPUT"
