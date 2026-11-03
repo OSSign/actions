@@ -1,0 +1,39 @@
+name: 'OSSign: Trusted Workflow Dispatch'
+description: "Use this action to trigger a workflow containing signing for your repository, wait and retrieve signed artifacts, without any secrets. Authenticates with a GitHub OIDC token, so the job needs the id-token: write permission and your OSSign dispatch client must trust this repository's workflow."
+author: 'OSSign Team'
+inputs:
+  client:
+    description: 'The OSSign dispatch client name. Defaults to <owner>-<repo> of this repository, lower case.'
+    required: false
+    default: ''
+  server:
+    description: 'The URL of the OSSign signing server.'
+    required: false
+    default: 'https://signer.ossign.org'
+  audience:
+    description: 'Audience for the OIDC token. Defaults to the dispatchAudience the OSSign server announces.'
+    required: false
+    default: ''
+  dispatch_only:
+    description: 'If true, the action will dispatch the event and immediately return. If false, the action will wait for the workflow to complete and return signed artifact URLs.'
+    required: false
+    default: 'false'
+  single_check:
+    description: 'If set, the action will only do a single check of the specified workflow run.'
+    required: false
+    default: ''
+branding:
+  icon: 'user-check'
+  color: 'blue'
+runs:
+  using: node24
+  main: 'dist/index.js'
+outputs:
+  workflow_id:
+    description: 'The ID of the dispatched workflow run.'
+  signed_artifacts:
+    description: 'A list of signed artifacts URLs.'
+  finished:
+    description: 'Whether the workflow has finished or not.'
+  status:
+    description: 'Status of the request: success, rejected (the review denied it), failure, error, or the current status when not finished.'

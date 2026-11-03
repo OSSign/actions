@@ -4,8 +4,10 @@ import ky from "ky";
 import { WorkflowStatusResponse } from "./models/workflow-status-response.ts";
 import { WorkflowDispatchRequest } from "./models/workflow-dispatch-request.ts";
 
+let server = "https://api.ossign.org";
+
 async function CallApi(action: string, body: any, token: string) : Promise<WorkflowStatusResponse> {
-    const response = await ky.post(`https://api.ossign.org/api/v1/${action}`, {
+    const response = await ky.post(`${server}/api/v1/${action}`, {
         timeout: 60000,
         headers: {
             'Content-Type': 'application/json',
@@ -57,6 +59,7 @@ export async function run() {
     const token = core.getInput("token");
     const dispatch_only = core.getInput("dispatch_only").toLowerCase() === "true";
     const single_check = core.getInput("single_check");
+    server = (core.getInput("server").trim() || server).replace(/\/+$/, "");
 
     if (!username || username.trim() === "") {
         core.setFailed("Username is required");

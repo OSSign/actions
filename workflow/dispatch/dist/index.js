@@ -31909,8 +31909,9 @@ const createInstance = (defaults) => {
 };
 const ky = createInstance();
 
+let server = "https://api.ossign.org";
 async function CallApi(action, body, token) {
-    const response = await ky.post(`https://api.ossign.org/api/v1/${action}`, {
+    const response = await ky.post(`${server}/api/v1/${action}`, {
         timeout: 60000,
         headers: {
             'Content-Type': 'application/json',
@@ -31948,6 +31949,7 @@ async function run() {
     const token = coreExports.getInput("token");
     const dispatch_only = coreExports.getInput("dispatch_only").toLowerCase() === "true";
     const single_check = coreExports.getInput("single_check");
+    server = (coreExports.getInput("server").trim() || server).replace(/\/+$/, "");
     if (!username || username.trim() === "") {
         coreExports.setFailed("Username is required");
         return;

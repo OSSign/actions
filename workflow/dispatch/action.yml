@@ -8,6 +8,10 @@ inputs:
   token:
     description: 'The OSSign token to use for authentication. Make sure to put this in a secret.'
     required: true
+  server:
+    description: 'The URL of the OSSign dispatch API.'
+    required: false
+    default: 'https://api.ossign.org'
   dispatch_only:
     description: 'If true, the action will dispatch the event and immediately return. If false, the action will wait for the workflow to complete and return signed artifact URLs.'
     required: false

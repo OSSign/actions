@@ -2,13 +2,15 @@
 Github actions for various code signing tasks.
 
 ## Summary
-The **ossign/actions/workflow/dispatch** action is primarily for those who have our code signing service. This workflow will submit a request to build and/or sign a binary for your project, you will need a username and key to use it to send the requests. You will be provided the credentials when your application is approved.
+The **ossign/actions/workflow/dispatch** action is primarily for those who have our code signing service. This workflow will submit a request to build and/or sign a binary for your project, you will need a username and key to use it to send the requests. You will be provided the credentials when your application is approved. The **ossign/actions/workflow/trusted-dispatch** action does the same without any credentials, using a GitHub OIDC token from a workflow your dispatch client trusts.
 
 The **ossign/actions/setup-ossign** action belongs to our [open source signing tool (ossign/ossign)](https://github.com/ossign/ossign), for more information regarding this visit the repository readme.
 
 ## workflow/dispatch
 Use this action to trigger code signing workflows in your repository, wait for completion, and retrieve signed artifacts. You need to have a pre-existing OSSign repository set up for your project, including credentials, to use this action.
 Since the signature process requires manual approval, there are two choices for waiting for completion:
+
+The `server` input sets the dispatch API to use (default `https://api.ossign.org`).
 
 ### Returns
 - `finished`: "true" if the signing is complete, "false" otherwise.
@@ -178,9 +180,38 @@ jobs:
 
 ```
 
+## workflow/trusted-dispatch
+Same as **workflow/dispatch**, but without any secrets. Instead of a username and token, the action sends a GitHub OIDC token that proves which repository, ref and workflow it runs in. Your OSSign dispatch client must have a trusted workflow set for your repository (usually limited to a ref such as `refs/tags/v*`), and the job needs the `id-token: write` permission. A fresh token is minted for every call, so waiting for a long review works.
 
+### Inputs
+- `client`: The dispatch client name. Defaults to `<owner>-<repo>` of your repository, lower case.
+- `server`: The OSSign signing server. Defaults to `https://signer.ossign.org`.
+- `audience`: The OIDC token audience. Defaults to the `dispatchAudience` the server announces at `/api/v1/info`.
+- `dispatch_only`, `single_check`: As for **workflow/dispatch**.
 
+### Returns
+The same outputs as **workflow/dispatch**, plus `status`: `success`, `rejected` (the review denied the request), `failure`, `error`, or the current status when not finished. The job fails if the request is rejected or the signing workflow fails.
 
+Example:
+```yaml
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+jobs:
+  sign:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write   # only this job; keep untrusted build steps out of it
+      contents: read
+    steps:
+      - uses: ossign/actions/workflow/trusted-dispatch@main
+        id: dispatch
+
+      - run: |
+          echo "Signed artifacts: ${{ steps.dispatch.outputs.signed_artifacts }}"
+```
 
 ## setup-ossign
 Use this action to set up the OSSign binary in your workflow. It will download and install the OSSign CLI tool, and configure it with your credentials.
