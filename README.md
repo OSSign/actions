@@ -214,45 +214,4 @@ jobs:
 ```
 
 ## setup-ossign
-Use this action to set up the OSSign binary in your workflow. It will download and install the OSSign CLI tool, and configure it with your credentials.
-Example:
-```yaml
-on:
-  push:
-    tags:
-      - 'v*.*.*'
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - uses: ossign/actions/setup-ossign@main
-        with:
-          # Required to fetch the binary
-          # only needs read access to public repos
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-          # Set the OSSign config on the server. Can be set to an empty string if you want to provide this via the -c flag on run
-          ossignConfig: |
-            {
-                "tokenType": "azure",
-                "azure": {
-                    "vaultUrl": ""
-                    "tenantId": "",
-                    "clientId": "",
-                    "clientSecret": "",
-                    "certificateName": "",
-                    "certificateVersion": ""
-                },
-                "certificate": {
-                    "certificate": "",
-                    "privateKey": ""
-                },
-                "timestampUrl": "http://timestamp.globalsign.com/tsa/advanced",
-                "msTimestampUrl": "http://timestamp.microsoft.com/tsa"
-            }
-
-      - run: |
-          ossign --sign-type msi filetosign.msi --output signedfile.msi
-```
-
+This action is deprecated in favor of the newer [ossign/ossign](https://github.com/ossign/ossign) action
